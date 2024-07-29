@@ -4,7 +4,6 @@
 #include <regex.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <math.h>
 
 #define MAX_MIC 1000000
 #define MAX_SEC 60
@@ -127,7 +126,7 @@ ts_stamp create_timestamp(char *time)
             stamp.sec = (int)strtol(delim_t, &dec, 10);
             *dec = '.';
             float f = strtof(delim_t, NULL);
-            stamp.mic = (int)roundf((f - floorf(f)) * MIC_IN_SEC);
+            stamp.mic = (int)((f - (float)(int)f) * MIC_IN_SEC);
         }
 
         delim_t = strtok(NULL, ":");
@@ -234,7 +233,7 @@ int resync(const char *read, char *write, float offset)
     }
 
     int offset_s = (int)offset;
-    int offset_u = (int)roundf((offset - (float)(int)(offset)) * MIC_IN_SEC);
+    int offset_u = (int)((offset - (float)(int)(offset)) * 1000000);
 
     assert(regcomp(&re_ts, pattern_ts, REG_EXTENDED) == 0);
 
