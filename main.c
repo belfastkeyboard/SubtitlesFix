@@ -177,6 +177,25 @@ bool cmp_ts(ts_stamp *a, ts_stamp *b)
     return a_ms < b_ms;
 }
 
+int get_file(char *string, char **file, char *cmp)
+{
+    char ext[5] = { 0 };
+
+    if ((strlen(string) < EXT_LEN) || (!strchr(string, '.')) || (cmp && strcmp(string, cmp) == 0) || *file)
+        return EXIT_SUCCESS;
+
+    size_t b = strlen(string);
+    strncpy(ext, string + b-EXT_LEN, EXT_LEN);
+    if (strcmp(ext, ".srt") != 0)
+    {
+        fprintf(stderr, "Not .srt file: %s.\n", string);
+        return EXIT_FAILURE;
+    }
+
+    *file = string;
+    return EXIT_SUCCESS;
+}
+
 int resync(const char *read, char *write, float offset)
 {
     FILE* readfrom = NULL;
@@ -245,8 +264,7 @@ int resync(const char *read, char *write, float offset)
             fit_time(&pair.first);
             fit_time(&pair.second);
 
-            char *msg1[TS_LEN];
-            char *msg2[TS_LEN];
+            char *msg1[TS_LEN], msg2[TS_LEN];
             snprintf(
                 line, TS_LEN + TS_LEN + strlen(newline) + strlen(" --> "), "%s --> %s%s",
                 time_repr(pair.first, (char*)msg1), time_repr(pair.second, (char*)msg2), newline
@@ -261,6 +279,7 @@ int resync(const char *read, char *write, float offset)
     free(line);
     fclose(readfrom);
     fclose(writeto);
+
     return EXIT_SUCCESS;
 }
 
@@ -334,29 +353,11 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "-file") == 0)
         {
-            char ext[5] = { 0 };
-            size_t b = strlen(argv[i+1]);
-            strncpy(ext, argv[i+1] + b-EXT_LEN, EXT_LEN);
-            if (strcmp(ext, ".srt") != 0)
-            {
-                fprintf(stderr, "Not .srt file: %s.\n", argv[i+1]);
-                return EXIT_FAILURE;
-            }
-
-            read = argv[i + 1];
+            get_file(argv[i+1], &read, NULL);
         }
         else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "-output") == 0)
         {
-            char ext[5] = { 0 };
-            size_t b = strlen(argv[i+1]);
-            strncpy(ext, argv[i+1] + b-EXT_LEN, EXT_LEN);
-            if (strcmp(ext, ".srt") != 0)
-            {
-                fprintf(stderr, "Not .srt file: %s.\n", argv[i+1]);
-                return EXIT_FAILURE;
-            }
-
-            write = argv[i + 1];
+            get_file(argv[i+1], &write, NULL);
         }
         else if (strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "-amount") == 0)
         {
@@ -366,8 +367,41 @@ int main(int argc, char *argv[])
 
     if (read == NULL)
     {
-        fprintf(stderr, "File not specified.\n");
-        return EXIT_FAILURE;
+        for (int i = 1; i < argc; i++)
+        {
+            get_file(argv[i], &read, NULL);
+        }
+
+        if (read == NULL)
+        {
+            fprintf(stderr, "File not specified.\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (tool == Resync && write == NULL)
+    {
+        for (int i = 1; i < argc; i++)
+        {
+            get_file(argv[i], &write, read);
+        }
+    }
+
+    if (tool == Resync && amount == 0.0f)
+    {
+        for (int i = 1; i < argc; i++)
+        {
+            float n = strtof(argv[i], NULL);
+            if (n && !amount)
+            {
+                amount = n;
+            }
+            else if (n && amount)
+            {
+                fprintf(stderr, "Ambiguous amount argument.\n");
+                return EXIT_FAILURE;
+            }
+        }
     }
 
     switch (tool)
